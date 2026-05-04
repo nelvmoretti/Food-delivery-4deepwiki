@@ -1,0 +1,63 @@
+Bài tập lớn số 2 – Hệ CSDL
+Yêu cầu: sử dụng hệ quản trị CSDL MS SQL Server hoặc MySQL.
+Nộp báo cáo sơ bộ (xem mẫu Báo cáo sơ bộ BTL2), vào buổi học thứ 5 của lịch thực hành.
+Báo cáo và nộp báo cáo sau cùng (xem MẪU BÁO CÁO BÀI TẬP LỚN SỐ 2) vào buổi học thứ 6 của lịch thực hành.
+Các nhóm nộp file báo cáo trên LMS hạn chót: 
+- Các lớp học tuần chẵn: Chủ nhật  23/11/2025 (cuối tuần 47)
+- Các lớp học tuần lẻ: Chủ nhật 7/12/2025 (cuối tuần 49)
+Tạo bảng và dữ liệu mẫu (3 điểm):
+(2 điểm) Viết các câu lệnh hiện thực TẤT CẢ bảng dữ liệu đã thiết kế, trong đó có các ràng buộc khóa chính, khóa ngoại, các ràng buộc dữ liệu và các ràng buộc ngữ nghĩa nêu trong bài tập lớn 1 (sử dụng check hoặc trigger).
+Lưu ý: những ràng buộc nào có thể kiểm tra trong câu lệnh tạo bảng thì không dùng trigger để kiểm tra.
+(1 điểm) Tạo dữ liệu mẫu có ý nghĩa ở tất cả các bảng, ít nhất 5 hàng mỗi bảng (có thể nhập liệu bằng giao diện hoặc viết câu lệnh)
+
+Viết các trigger, thủ tục, hàm (4 điểm)
+(1 điểm) Viết các thủ tục để thêm (insert), sửa (update), xóa (delete) dữ liệu vào MỘT bảng dữ liệu. Yêu cầu:
+Phải có thực hiện việc kiểm tra dữ liệu hợp lệ (validate) để đảm bảo các ràng buộc của bảng dữ liệu. Xuất ra thông báo lỗi có nghĩa, chỉ ra được lỗi sai cụ thể (không ghi chung chung là “Lỗi nhập dữ liệu!”)
+Ví dụ: kiểm tra tuổi nhân viên > 18 tuổi, kiểu format số điện thoại, email là hợp lệ, lương nhân viên nhỏ hơn lương giám đốc … 
+Với thủ tục xóa (DELETE), cần xác định khi nào được xóa và khi nào không được xóa dữ liệu. Mục đích của thủ tục xóa là gì, tại sao cần xóa? 
+(1 điểm) Viết TRIGGER:
+2.2.1 Nêu 1 ràng buộc về nghiệp vụ của ứng dụng mà cần sử dụng trigger để kiểm tra:
+Xác định các thao tác DML nào có thể dẫn đến vi phạm ràng buộc.
+Viết (các) trigger kiểm tra ràng buộc.
+Lưu ý: những ràng buộc nào có thể kiểm tra trong câu lệnh tạo bảng thì không dùng trigger để kiểm tra.
+2.2.2 Chọn một thuộc tính dẫn xuất và viết trigger để tính giá trị cho thuộc tính này.
+Xác định các thao tác DML nào làm thay đối giá trị của thuộc tính dẫn xuất
+Viết (các) trigger tính giá trị thuộc tính đó.
+Lưu ý: nếu trong trigger tính giá trị cho thuộc tính A có sử dụng giá trị của thuộc tính dẫn xuất B thì phải tính được B trước! 
+Ví dụ: trigger tự động cập nhật thuộc tính tổng doanh thu của cửa hàng dựa trên các tổng giá trị các đơn hàng, thì cần tính tổng giá trị đơn hàng trước. KHÔNG GIẢ SỬ là đã có tổng giá trị đơn hàng sẵn rồi 😊.
+YÊU CẦU CHUNG: Chuẩn bị câu lệnh và dữ liệu minh họa cho việc kiểm tra trigger khi báo cáo.
+(1 điểm) Viết 2 thủ tục trong đó chỉ chứa các câu truy vấn để hiển thị dữ liệu và tham số đầu vào là các giá trị trong mệnh đề WHERE và/hoặc Having (nếu có), gồm:
+1 câu truy vấn từ 2 bảng trở lên có mệnh đề where, order by
+1 câu truy vấn có aggreate function, group by, having, where và order by có liên kết từ 2 bảng trở lên
+Có ít nhất 1 thủ tục liên quan đến việc lấy dữ liệu từ bảng trong câu 2.1
+Chuẩn bị câu lệnh và dữ liệu minh họa cho việc gọi thủ tục khi báo cáo.
+(1 điểm) Viết 2 hàm thỏa yêu cầu sau:
+Chứa câu lệnh IF và/hoặc LOOP để tính toán dữ liệu được lưu trữ
+Có sử dụng con trỏ.
+Chứa câu lệnh truy vấn dữ liệu, lấy dữ liệu từ câu truy vấn để kiểm tra tính toán
+Có tham số đầu vào và kiểm tra tham số đầu vào
+Chuẩn bị các câu lệnh và dữ liệu để minh họa việc gọi hàm khi báo cáo.
+Hiện thực ứng dụng (3 điểm)
+Viết chương trình (web, mobile, desktop app) minh họa việc kết nối ứng dụng với CSDL. Trong đó: 
+(1 điểm) Hiện thực 1 màn hình để thể hiện chức năng thêm/xóa/sửa dữ liệu vào bảng dữ liệu trong câu 2.1. 
+(1 điểm) 1 giao diện hiển thị danh sách dữ liệu từ việc gọi thủ tục trong câu số 2.3 và liên quan đến bảng ở câu 2.1. Cho phép cập nhật, xóa dữ liệu từ danh sách. Ngoài ra còn có: các chức năng như tìm kiếm, sắp xếp, validate dữ liệu nhập vào, xử lý lỗi logic khi cập nhật và xóa dữ liệu, thông báo lỗi phù hợp và cụ thể, control sử dụng hợp lý, giao diện dễ nhìn.
+Ví dụ: 1 giao diện hiển thị danh sách các sản phẩm, trong đó có search, filter, sắp xếp, có chức năng tạo mới sản phẩm (gọi lại giao diện phần a), có chức năng chọn 1 hàng dữ liệu để xóa sản phẩm hoặc cập nhật thông tin sản phẩm.
+(1 điểm) 1 Giao diện minh họa cho ít nhất 1 thủ tục khác trong câu 2.3 hoặc hàm trong câu 2.4. (có thể dùng chung giao diện phần 3.2 nếu cùng bảng dữ liệu)
+
+Lưu ý CHUNG:
+Tất cả SV trong nhóm PHẢI viết ít nhất 1 câu trong phần số 2 (viết trigger, function, procedure), nếu ai không làm sẽ KHÔNG CÓ điểm BTL2.
+Về các câu lệnh SQL (phần 2):
+Điểm từng phần (các trigger, hàm và thủ tục) có xét đến độ phức tạp, độ hoàn chỉnh và ý nghĩa phù hợp với nghiệp vụ của ứng dụng.
+Về ứng dụng (phần 3):
+Chức năng hiển thị danh sách dữ liệu từ việc gọi thủ tục với các tham số đầu vào tương ứng trong mệnh đề Where hay Having do người dùng nhập trong các textbox hoặc combo box hoặc calendar picker, v.v. (Tương ứng với chức năng search thường thấy trong các ứng dụng hoặc website)
+Các thao tác thêm, sửa, xóa phải thực hiện việc gọi các thủ tục trong câu 2.1. 
+Ứng dụng PHẢI THỰC SỰ KẾT NỐI với CSDL được tạo ở phần 1. Nếu không sẽ không có điểm phần Ứng dụng.
+Điểm trừ
+Các hàm, thủ tục, trigger có nội dung gần giống nhau. Ví dụ: thủ tục 1 hiển thị danh sách nhân viên theo tên nhân viên, thủ tục 2 hiển thị danh sách nhân viên theo mã số nhân viên, …
+Dữ liệu chuẩn bị báo cáo quá ít, hoặc không có ý nghĩa.
+Thành viên không nắm được ý nghĩa và nội dung của từng hàm, thủ tục (dù không phải phần mình làm). Không thực hiện được các thao tác theo yêu cầu của giáo viên. Điểm trừ này áp dụng cho cá nhân hoặc nhóm.
+Thành viên nào không thực hiện bài tập lớn, các thành viên khác có trách nhiệm thông báo để nhóm không bị trừ điểm tập thể.
+
+Ngày: ___________________________  Lớp: ____________________  		Nhóm: ________________________________
+Thành viên: _________________________________________________________________________________________________
+
