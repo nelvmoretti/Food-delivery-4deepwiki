@@ -75,3 +75,7 @@ Desktop.ini
 
 # Notebook outputs
 *.nbconvert.ipynb
+
+backend/node_modules/
+backend/.env/
+luoc_do_images/
