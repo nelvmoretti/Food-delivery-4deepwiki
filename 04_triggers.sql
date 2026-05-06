@@ -4,11 +4,18 @@
 -- Chu de: Logistic Giao Do An
 -- File 4: Triggers
 -- Gom:
---   4.1 Trigger rang buoc nghiep vu - Tai xe nhan don
---   4.2 Trigger tinh thuoc tinh dan xuat - Tong_tien DON_HANG
---   4.3 Trigger tinh thuoc tinh dan xuat - Doanh_thu NHA_HANG
---   4.4 Trigger tinh thuoc tinh dan xuat - Gia_chot CHI_TIET_DON_HANG (BO SUNG)
---   4.5 Trigger dong bo trang thai don hang khi tai xe cap nhat (BO SUNG)
+--   4.1  Trigger rang buoc nghiep vu    - Tai xe nhan don (khong nhan 2 don cung luc)
+--   4.2  Trigger tinh dan xuat          - Tong_tien DON_HANG
+--   4.3  Trigger tinh dan xuat          - Doanh_thu NHA_HANG
+--   4.4  Trigger tinh dan xuat          - Gia_chot CHI_TIET_DON_HANG
+--   4.5  Trigger dong bo                - Trang thai DON_HANG khi tai xe cap nhat
+--   4.6  Trigger rang buoc ngu nghia    - Nha hang phai co it nhat 1 mon an
+--   4.7  Trigger rang buoc ngu nghia    - Tu dong tao GIO_HANG khi tao KHACH_HANG
+--   4.8  Trigger rang buoc ngu nghia    - Nguoi dung phai co it nhat 1 so dien thoai
+--   4.9  Trigger validate               - Tai xe phai Online khi nhan don
+--   4.10 Trigger validate               - Khach hang chi danh gia mon da dat va nhan
+--   4.11 Trigger validate               - Khong chuyen trang thai don hang nguoc chieu
+--   4.12 Trigger validate               - Khong sua thanh toan cua don da huy
 -- =============================================
 USE LogisticGiaoDoAn;
 GO
@@ -18,9 +25,7 @@ GO
 -- Ten: trg_CheckTaiXeNhanDon
 -- Rang buoc: Mot tai xe chi duoc nhan don hang moi khi KHONG co
 --            don hang nao dang o trang thai 'Dang_giao'.
--- Thao tac DML: INSERT, UPDATE tren TAI_XE_NHAN_DON
--- Ly do: Dam bao tai xe chi giao 1 don tai 1 thoi diem,
---        tranh truong hop tai xe nhan nhieu don cung luc.
+-- Thao tac DML bi anh huong: INSERT, UPDATE tren TAI_XE_NHAN_DON
 -- =============================================
 IF OBJECT_ID('trg_CheckTaiXeNhanDon', 'TR') IS NOT NULL
     DROP TRIGGER trg_CheckTaiXeNhanDon;
@@ -33,7 +38,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Kiem tra tai xe vua INSERT/UPDATE co dang giao don khac khong
+    -- Kiem tra xem tai xe vua duoc INSERT/UPDATE co dang giao don khac hay khong
     IF EXISTS (
         SELECT 1
         FROM inserted i
@@ -50,7 +55,7 @@ BEGIN
         RETURN;
     END
 
-    -- Dong bo trang thai tai xe theo trang thai don hang moi nhat
+    -- Cap nhat trang thai tai xe tuong ung voi trang thai don
     UPDATE tx
     SET Trang_thai =
         CASE
@@ -68,9 +73,7 @@ GO
 -- Ten: trg_UpdateTongTienDonHang
 -- Khi nao chay: Sau moi INSERT / UPDATE / DELETE tren CHI_TIET_DON_HANG
 -- Logic: Tong_tien = SUM(So_luong * Gia_chot) cua cac chi tiet cung don hang
--- Luu y: Trigger nay chay TRUOC trg_UpdateDoanhThuNhaHang vi:
---        trg_UpdateDoanhThuNhaHang doc Tong_tien tu DON_HANG,
---        nen Tong_tien phai duoc cap nhat truoc.
+-- Luu y: Trigger nay chay SAU trg_SetGiaChot (duoc dat la LAST)
 -- =============================================
 IF OBJECT_ID('trg_UpdateTongTienDonHang', 'TR') IS NOT NULL
     DROP TRIGGER trg_UpdateTongTienDonHang;
@@ -83,13 +86,10 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Cap nhat Tong_tien cho tat ca don hang bi anh huong trong 1 lan
-    -- (xu ly ca truong hop INSERT/UPDATE nhieu dong cung luc)
     UPDATE dh
     SET dh.Tong_tien = ISNULL(agg.TongMoi, 0)
     FROM DON_HANG dh
     JOIN (
-        -- Lay danh sach cac ID don hang bi anh huong (tu ca inserted va deleted)
         SELECT DISTINCT ID_don_hang FROM inserted
         UNION
         SELECT DISTINCT ID_don_hang FROM deleted
@@ -106,9 +106,7 @@ GO
 -- 4.3. TRIGGER TINH THUOC TINH DAN XUAT: Doanh_thu (NHA_HANG)
 -- Ten: trg_UpdateDoanhThuNhaHang
 -- Khi nao chay: Sau moi INSERT / UPDATE / DELETE tren DON_HANG
--- Logic: Doanh_thu = SUM(Tong_tien) cua cac don hang co trang thai = 'Da_giao'
---        thuoc nha hang do
--- Luu y: Chi tinh don Da_giao, khong tinh don Da_huy / Dang_giao / Cho_xac_nhan
+-- Logic: Doanh_thu = SUM(Tong_tien) cua don hang trang thai = 'Da_giao'
 -- =============================================
 IF OBJECT_ID('trg_UpdateDoanhThuNhaHang', 'TR') IS NOT NULL
     DROP TRIGGER trg_UpdateDoanhThuNhaHang;
@@ -121,7 +119,6 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Cap nhat Doanh_thu cho tat ca nha hang bi anh huong
     UPDATE nh
     SET nh.Doanh_thu = ISNULL(agg.DoanhThuMoi, 0)
     FROM NHA_HANG nh
@@ -140,21 +137,15 @@ END
 GO
 
 -- =============================================
--- 4.4. TRIGGER TINH THUOC TINH DAN XUAT: Gia_chot (CHI_TIET_DON_HANG) -- BO SUNG
+-- 4.4. TRIGGER TINH THUOC TINH DAN XUAT: Gia_chot (CHI_TIET_DON_HANG)
 -- Ten: trg_SetGiaChot
 -- Khi nao chay: Sau khi INSERT vao CHI_TIET_DON_HANG
 -- Logic:
---   Gia_chot = MON_AN.Gia - (Tien_giam_gia tot nhat dang con han cho mon an do)
---   Neu mon an khong co khuyen mai nao con han => Gia_chot = MON_AN.Gia
---   Dam bao Gia_chot >= 0 (tranh giam gia qua lon)
--- Ly do can them:
---   Theo THAY_DOI_VOI_DATABASE.md muc 6.4, Gia_chot la thuoc tinh dan xuat
---   nhung chua co trigger tu dong dien gia tri khi Insert.
--- Luu y ve thu tu trigger:
---   trg_SetGiaChot (chay truoc, cap nhat Gia_chot)
---   => trg_UpdateTongTienDonHang (chay sau, doc Gia_chot de tinh Tong_tien)
---   SQL Server thuc thi AFTER trigger theo thu tu: FIRST -> trigger thuong -> LAST
---   Dat trg_SetGiaChot la FIRST, trg_UpdateTongTienDonHang la LAST
+--   Gia_chot = MON_AN.Gia - (Tien_giam_gia tot nhat con han cho mon an do)
+--   Neu khong co khuyen mai => Gia_chot = MON_AN.Gia
+--   Dam bao Gia_chot >= 0
+-- Nguon: THAY_DOI_VOI_DATABASE.md muc 6.4
+-- Thu tu: FIRST (phai chay truoc trg_UpdateTongTienDonHang)
 -- =============================================
 IF OBJECT_ID('trg_SetGiaChot', 'TR') IS NOT NULL
     DROP TRIGGER trg_SetGiaChot;
@@ -167,8 +158,6 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Cap nhat Gia_chot cho tung dong moi duoc insert
-    -- Gia_chot = Gia goc - Khuyen mai tot nhat con han (neu co)
     UPDATE ct
     SET ct.Gia_chot =
         CASE
@@ -184,7 +173,6 @@ BEGIN
                    AND ct.ID_mon_an   = i.ID_mon_an
     JOIN MON_AN ma ON ct.ID_mon_an = ma.ID
     LEFT JOIN (
-        -- Tim khuyen mai co tien giam cao nhat, con trong han su dung
         SELECT
             kmcma.ID_mon_an,
             MAX(km.Tien_giam_gia) AS MaxGiam
@@ -196,8 +184,7 @@ BEGIN
 END
 GO
 
--- Thiet lap thu tu thuc thi: trg_SetGiaChot chay TRUOC trg_UpdateTongTienDonHang
--- (chi co tac dung neu ca 2 trigger cung tren 1 bang va 1 thao tac INSERT)
+-- Thiet lap thu tu: trg_SetGiaChot FIRST, trg_UpdateTongTienDonHang LAST
 EXEC sp_settriggerorder
     @triggername = N'trg_SetGiaChot',
     @order       = N'First',
@@ -211,18 +198,15 @@ EXEC sp_settriggerorder
 GO
 
 -- =============================================
--- 4.5. TRIGGER DONG BO TRANG THAI DON HANG KHI TAI XE CAP NHAT -- BO SUNG
+-- 4.5. TRIGGER DONG BO TRANG THAI DON HANG KHI TAI XE CAP NHAT
 -- Ten: trg_SyncDonHangFromTaiXe
--- Khi nao chay: Sau khi UPDATE trang thai trong TAI_XE_NHAN_DON
--- Logic:
---   Khi tai xe cap nhat Trang_thai_don -> tu dong cap nhat Trang_thai DON_HANG
+-- Khi nao chay: Sau khi UPDATE Trang_thai_don trong TAI_XE_NHAN_DON
+-- Logic mapping:
 --   'Da_nhan'   -> DON_HANG.Trang_thai = 'Da_xac_nhan'
 --   'Dang_giao' -> DON_HANG.Trang_thai = 'Dang_giao'
 --   'Da_giao'   -> DON_HANG.Trang_thai = 'Da_giao'
 --   'Da_huy'    -> DON_HANG.Trang_thai = 'Da_huy'
--- Ly do can them:
---   Tranh truong hop DON_HANG.Trang_thai va TAI_XE_NHAN_DON.Trang_thai_don
---   bi mat dong bo khi cap nhat mot phia.
+-- Muc dich: Tranh mat dong bo giua 2 bang khi cap nhat mot phia
 -- =============================================
 IF OBJECT_ID('trg_SyncDonHangFromTaiXe', 'TR') IS NOT NULL
     DROP TRIGGER trg_SyncDonHangFromTaiXe;
@@ -235,7 +219,6 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Chi xu ly khi cot Trang_thai_don thuc su thay doi
     IF NOT UPDATE(Trang_thai_don)
         RETURN;
 
@@ -246,7 +229,7 @@ BEGIN
             WHEN N'Dang_giao' THEN N'Dang_giao'
             WHEN N'Da_giao'   THEN N'Da_giao'
             WHEN N'Da_huy'    THEN N'Da_huy'
-            ELSE dh.Trang_thai -- Giu nguyen neu khong khop
+            ELSE dh.Trang_thai
         END
     FROM DON_HANG dh
     JOIN inserted i ON dh.ID = i.ID_don_hang;
@@ -254,83 +237,406 @@ END
 GO
 
 -- =============================================
+-- 4.6. TRIGGER RANG BUOC NGU NGHIA: Nha hang phai co it nhat 1 mon an
+-- Ten: trg_CheckNhaHangCoMonAn
+-- Khi nao chay: Truoc khi DELETE tren MON_AN
+-- Logic: Neu xoa mon an cuoi cung cua nha hang -> chặn va bao loi
+-- Nguon: THAY_DOI_VOI_DATABASE.md muc 4.2
+-- Ghi chu: Chieu Nha hang -> Mon an (Mandatory) khong the rang buoc bang
+--          CHECK/FK thuan tuy, phai dung Trigger
+-- =============================================
+IF OBJECT_ID('trg_CheckNhaHangCoMonAn', 'TR') IS NOT NULL
+    DROP TRIGGER trg_CheckNhaHangCoMonAn;
+GO
+
+CREATE TRIGGER trg_CheckNhaHangCoMonAn
+ON MON_AN
+INSTEAD OF DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Kiem tra tung mon an bi xoa: neu la mon cuoi cung cua nha hang -> chan
+    IF EXISTS (
+        SELECT 1
+        FROM deleted d
+        WHERE (
+            SELECT COUNT(*)
+            FROM MON_AN
+            WHERE ID_nha_hang = d.ID_nha_hang
+        ) = 1
+    )
+    BEGIN
+        RAISERROR(
+            N'Loi rang buoc ngu nghia: Khong the xoa mon an cuoi cung cua nha hang. Moi nha hang phai co it nhat 1 mon an.',
+            16, 1
+        );
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+
+    -- Neu hop le (con nhieu hon 1 mon), thuc hien xoa binh thuong
+    DELETE FROM MON_AN
+    WHERE ID IN (SELECT ID FROM deleted);
+END
+GO
+
+-- =============================================
+-- 4.7. TRIGGER RANG BUOC NGU NGHIA: Tu dong tao GIO_HANG khi tao KHACH_HANG
+-- Ten: trg_AutoCreateGioHang
+-- Khi nao chay: Sau khi INSERT vao KHACH_HANG
+-- Logic: Moi khach hang moi phai co dung 1 gio hang (quan he 1:1 Mandatory)
+--        -> Tu dong INSERT vao GIO_HANG sau khi khach hang duoc tao
+-- Nguon: THAY_DOI_VOI_DATABASE.md muc 2
+-- =============================================
+IF OBJECT_ID('trg_AutoCreateGioHang', 'TR') IS NOT NULL
+    DROP TRIGGER trg_AutoCreateGioHang;
+GO
+
+CREATE TRIGGER trg_AutoCreateGioHang
+ON KHACH_HANG
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Tu dong tao gio hang tuong ung cho tung khach hang moi
+    INSERT INTO GIO_HANG (Thoi_gian_tao, Trang_thai, ID_khach_hang)
+    SELECT
+        GETDATE(),
+        N'Dang_mo',
+        i.ID
+    FROM inserted i
+    -- Chi tao neu chua co gio hang (tranh loi neu chay lai)
+    WHERE NOT EXISTS (
+        SELECT 1 FROM GIO_HANG WHERE ID_khach_hang = i.ID
+    );
+END
+GO
+
+-- =============================================
+-- 4.8. TRIGGER RANG BUOC NGU NGHIA: Nguoi dung phai co it nhat 1 so dien thoai
+-- Ten: trg_CheckSoDienThoai
+-- Khi nao chay: Truoc khi DELETE tren SO_DIEN_THOAI
+-- Logic: Neu xoa so dien thoai cuoi cung cua nguoi dung -> chan va bao loi
+-- Nguon: THAY_DOI_VOI_DATABASE.md muc 6.1
+-- =============================================
+IF OBJECT_ID('trg_CheckSoDienThoai', 'TR') IS NOT NULL
+    DROP TRIGGER trg_CheckSoDienThoai;
+GO
+
+CREATE TRIGGER trg_CheckSoDienThoai
+ON SO_DIEN_THOAI
+INSTEAD OF DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Kiem tra tung SDT bi xoa: neu la SDT cuoi cung cua nguoi dung -> chan
+    IF EXISTS (
+        SELECT 1
+        FROM deleted d
+        WHERE (
+            SELECT COUNT(*)
+            FROM SO_DIEN_THOAI
+            WHERE id_nguoi_dung = d.id_nguoi_dung
+        ) = 1
+    )
+    BEGIN
+        RAISERROR(
+            N'Loi rang buoc ngu nghia: Khong the xoa so dien thoai cuoi cung cua nguoi dung. Moi nguoi dung phai co it nhat 1 so dien thoai.',
+            16, 1
+        );
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+
+    -- Neu hop le (con nhieu SDT), thuc hien xoa binh thuong
+    DELETE FROM SO_DIEN_THOAI
+    WHERE SDT_chinh IN (SELECT SDT_chinh FROM deleted)
+      AND id_nguoi_dung IN (SELECT id_nguoi_dung FROM deleted);
+END
+GO
+
+-- =============================================
+-- 4.9. TRIGGER VALIDATE: Tai xe phai co trang thai Online khi nhan don
+-- Ten: trg_ValidateTaiXeOnline
+-- Khi nao chay: Truoc khi INSERT vao TAI_XE_NHAN_DON
+-- Logic: Tai xe co trang thai 'Offline' khong duoc nhan don moi
+--        (trg_CheckTaiXeNhanDon da xu ly 'Dang_giao', trigger nay xu ly 'Offline')
+-- =============================================
+IF OBJECT_ID('trg_ValidateTaiXeOnline', 'TR') IS NOT NULL
+    DROP TRIGGER trg_ValidateTaiXeOnline;
+GO
+
+CREATE TRIGGER trg_ValidateTaiXeOnline
+ON TAI_XE_NHAN_DON
+FOR INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN TAI_XE tx ON i.ID_tai_xe = tx.ID
+        WHERE tx.Trang_thai = N'Offline'
+    )
+    BEGIN
+        RAISERROR(
+            N'Loi validate: Tai xe dang o trang thai [Offline], khong the nhan don hang. Tai xe phai Online truoc khi nhan don.',
+            16, 1
+        );
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+END
+GO
+
+-- =============================================
+-- 4.10. TRIGGER VALIDATE: Khach hang chi duoc danh gia mon an da dat va nhan
+-- Ten: trg_ValidateDanhGia
+-- Khi nao chay: Truoc khi INSERT vao DANH_GIA
+-- Logic: Khach hang chi duoc danh gia mon an neu ho da co it nhat 1 don hang
+--        trang thai 'Da_giao' chua mon an do
+-- =============================================
+IF OBJECT_ID('trg_ValidateDanhGia', 'TR') IS NOT NULL
+    DROP TRIGGER trg_ValidateDanhGia;
+GO
+
+CREATE TRIGGER trg_ValidateDanhGia
+ON DANH_GIA
+FOR INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        WHERE NOT EXISTS (
+            -- Kiem tra khach hang da tung dat mon nay va don da giao thanh cong
+            SELECT 1
+            FROM CHI_TIET_DON_HANG ct
+            JOIN DON_HANG dh ON ct.ID_don_hang = dh.ID
+            WHERE dh.ID_khach_hang = i.ID_khach_hang
+              AND ct.ID_mon_an     = i.ID_mon_an
+              AND dh.Trang_thai    = N'Da_giao'
+        )
+    )
+    BEGIN
+        RAISERROR(
+            N'Loi validate: Khach hang chi co the danh gia mon an da duoc dat va giao thanh cong. Vui long dat hang truoc khi danh gia.',
+            16, 1
+        );
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+END
+GO
+
+-- =============================================
+-- 4.11. TRIGGER VALIDATE: Khong cho phep chuyen trang thai don hang nguoc chieu
+-- Ten: trg_ValidateTrangThaiDonHang
+-- Khi nao chay: Truoc khi UPDATE DON_HANG
+-- Logic luong trang thai hop le (chi di tien, khong di lui):
+--   Cho_xac_nhan -> Da_xac_nhan -> Dang_chuan_bi -> Dang_giao -> Da_giao
+--   Bat ky trang thai nao cung co the -> Da_huy (cho phep huy)
+-- =============================================
+IF OBJECT_ID('trg_ValidateTrangThaiDonHang', 'TR') IS NOT NULL
+    DROP TRIGGER trg_ValidateTrangThaiDonHang;
+GO
+
+CREATE TRIGGER trg_ValidateTrangThaiDonHang
+ON DON_HANG
+FOR UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Chi kiem tra khi cot Trang_thai thay doi
+    IF NOT UPDATE(Trang_thai)
+        RETURN;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN deleted d ON i.ID = d.ID
+        WHERE
+            -- Khong cho phep chuyen trang thai nguoc chieu
+            -- (Da_huy luon duoc phep tu bat ky trang thai nao)
+            i.Trang_thai <> N'Da_huy'
+            AND (
+                -- Da_xac_nhan chi duoc chuyen tu Cho_xac_nhan
+                (i.Trang_thai = N'Da_xac_nhan'   AND d.Trang_thai NOT IN (N'Cho_xac_nhan'))
+                OR
+                -- Dang_chuan_bi chi duoc chuyen tu Da_xac_nhan
+                (i.Trang_thai = N'Dang_chuan_bi' AND d.Trang_thai NOT IN (N'Da_xac_nhan'))
+                OR
+                -- Dang_giao chi duoc chuyen tu Dang_chuan_bi hoac Da_xac_nhan
+                (i.Trang_thai = N'Dang_giao'     AND d.Trang_thai NOT IN (N'Dang_chuan_bi', N'Da_xac_nhan'))
+                OR
+                -- Da_giao chi duoc chuyen tu Dang_giao
+                (i.Trang_thai = N'Da_giao'        AND d.Trang_thai NOT IN (N'Dang_giao'))
+                OR
+                -- Khong cho phep quay lai Cho_xac_nhan tu bat ky trang thai nao khac
+                (i.Trang_thai = N'Cho_xac_nhan'  AND d.Trang_thai <> N'Cho_xac_nhan')
+            )
+    )
+    BEGIN
+        RAISERROR(
+            N'Loi validate: Trang thai don hang khong hop le. Khong duoc phep chuyen trang thai nguoc chieu hoac bo qua buoc trong quy trinh xu ly don hang.',
+            16, 1
+        );
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+END
+GO
+
+-- =============================================
+-- 4.12. TRIGGER VALIDATE: Khong duoc sua thanh toan cua don hang da huy
+-- Ten: trg_ValidateThanhToan
+-- Khi nao chay: Truoc khi UPDATE THANH_TOAN
+-- Logic: Neu ban ghi THANH_TOAN lien ket voi DON_HANG co trang thai 'Da_huy'
+--        -> khong cho phep chinh sua thong tin thanh toan
+-- =============================================
+IF OBJECT_ID('trg_ValidateThanhToan', 'TR') IS NOT NULL
+    DROP TRIGGER trg_ValidateThanhToan;
+GO
+
+CREATE TRIGGER trg_ValidateThanhToan
+ON THANH_TOAN
+FOR UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN DON_HANG dh ON dh.ID_thanh_toan = i.ID
+        WHERE dh.Trang_thai = N'Da_huy'
+    )
+    BEGIN
+        RAISERROR(
+            N'Loi validate: Khong the chinh sua thong tin thanh toan cua don hang da bi huy.',
+            16, 1
+        );
+        ROLLBACK TRANSACTION;
+        RETURN;
+    END
+END
+GO
+
+-- =============================================
 -- TEST CASES MINH HOA
--- Chay sau khi da chay 01_create_tables.sql va 02_sample_data.sql
 -- =============================================
 
 -- === TEST 4.1 - Trigger rang buoc tai xe nhan don ===
-
--- Test 1a: TX 11 dang giao DH4 (Dang_giao) -> Thu nhan DH7 se bi loi
+-- Test 1a: TX 11 dang giao DH4 -> Thu nhan DH7 se bi loi
 -- INSERT INTO TAI_XE_NHAN_DON (ID_don_hang, ID_tai_xe, Trang_thai_don)
 -- VALUES (7, 11, N'Da_nhan');
--- => Ket qua mong doi: RAISERROR - Tai xe dang co don Dang_giao
+-- => Mong doi: RAISERROR - Tai xe dang co don Dang_giao
 
--- Test 1b: TX 12 dang ranh (tat ca don da Da_giao) -> Nhan DH7 thanh cong
+-- Test 1b: TX 12 dang ranh -> Nhan DH7 thanh cong
 -- INSERT INTO TAI_XE_NHAN_DON (ID_don_hang, ID_tai_xe, Trang_thai_don)
 -- VALUES (7, 12, N'Da_nhan');
--- => Ket qua mong doi: INSERT thanh cong, TAI_XE.Trang_thai = 'Online'
+-- => Mong doi: INSERT thanh cong
 
--- Test 1c: Update trang thai TX12 don 7 -> Dang_giao, kiem tra trang thai TX
--- UPDATE TAI_XE_NHAN_DON SET Trang_thai_don = N'Dang_giao'
--- WHERE ID_don_hang = 7;
--- => Ket qua mong doi: TAI_XE.Trang_thai cua TX12 = 'Dang_giao'
-
--- === TEST 4.2 - Trigger tinh Tong_tien don hang ===
-
--- Test 2a: Kiem tra Tong_tien DH1 hien tai
--- SELECT ID, Tong_tien FROM DON_HANG WHERE ID = 1;
--- => Mong doi: 130000 (2*45000 + 1*40000)
-
--- Test 2b: Them chi tiet vao DH1, kiem tra Tong_tien tu dong tang
+-- === TEST 4.2 - Trigger tinh Tong_tien ===
+-- Test 2a: Them chi tiet vao DH1, kiem tra Tong_tien tang
 -- INSERT INTO CHI_TIET_DON_HANG (ID_don_hang, So_luong, ID_mon_an, Gia_chot)
--- VALUES (1, 1, 2, 45000); -- Them 1 Pho bo chin
--- SELECT ID, Tong_tien FROM DON_HANG WHERE ID = 1;
--- => Mong doi: 175000 (130000 + 45000)
+-- VALUES (1, 1, 2, 45000);
+-- SELECT Tong_tien FROM DON_HANG WHERE ID = 1;
+-- => Mong doi: 175000
 
--- Test 2c: Xoa chi tiet vua them, kiem tra Tong_tien giam lai
--- DELETE FROM CHI_TIET_DON_HANG WHERE ID_don_hang = 1 AND ID_mon_an = 2;
--- SELECT ID, Tong_tien FROM DON_HANG WHERE ID = 1;
--- => Mong doi: 130000 (quay lai gia tri cu)
-
--- === TEST 4.3 - Trigger tinh Doanh_thu nha hang ===
-
--- Test 3a: Kiem tra doanh thu NHA_HANG 1 hien tai
--- SELECT ID_nha_hang, Ten, Doanh_thu FROM NHA_HANG WHERE ID_nha_hang = 1;
--- => Mong doi: 305000 (DH1: 130000 + DH5: 175000, ca hai Da_giao tai NH1)
-
--- Test 3b: Doi trang thai DH5 tu Da_giao sang Da_huy, doanh thu NH1 giam
--- UPDATE DON_HANG SET Trang_thai = N'Da_huy' WHERE ID = 5;
+-- === TEST 4.3 - Trigger tinh Doanh_thu ===
+-- Test 3a: Kiem tra doanh thu NH1 (DH1 + DH5 = 305000)
 -- SELECT Doanh_thu FROM NHA_HANG WHERE ID_nha_hang = 1;
--- => Mong doi: 130000 (chi con DH1)
-
--- Test 3c: Khoi phuc lai
--- UPDATE DON_HANG SET Trang_thai = N'Da_giao' WHERE ID = 5;
+-- => Mong doi: 305000
 
 -- === TEST 4.4 - Trigger tinh Gia_chot ===
-
--- Test 4a: Insert chi tiet cho mon MA1 (co khuyen mai KM1 giam 10000, han 2025-12-31)
--- MA1 gia goc = 45000, sau khuyen mai => Gia_chot mong doi = 35000
+-- Test 4a: MA1 co KM giam 10000, gia goc 45000 -> Gia_chot = 35000
 -- INSERT INTO CHI_TIET_DON_HANG (ID_don_hang, Ghi_chu, So_luong, ID_mon_an, Gia_chot)
--- VALUES (7, N'Test gia chot', 1, 1, 99999); -- Gia_chot 99999 se bi ghi de boi trigger
+-- VALUES (7, N'Test gia chot', 1, 1, 99999);
 -- SELECT Gia_chot FROM CHI_TIET_DON_HANG WHERE ID_don_hang = 7 AND ID_mon_an = 1;
--- => Mong doi: 35000 (trigger tu dong ghi de thanh Gia goc - KhuyenMai)
+-- => Mong doi: 35000
 
--- Test 4b: Insert chi tiet cho mon khong co khuyen mai (MA3 - Pho ga, gia 40000)
--- INSERT INTO CHI_TIET_DON_HANG (ID_don_hang, So_luong, ID_mon_an, Gia_chot)
--- VALUES (7, 1, 3, 99999);
--- SELECT Gia_chot FROM CHI_TIET_DON_HANG WHERE ID_don_hang = 7 AND ID_mon_an = 3;
--- => Mong doi: 40000 (bang gia goc vi khong co khuyen mai)
-
--- === TEST 4.5 - Trigger dong bo trang thai don hang ===
-
--- Test 5a: Cap nhat trang thai TAI_XE_NHAN_DON -> kiem tra DON_HANG dong bo
+-- === TEST 4.5 - Trigger dong bo trang thai ===
+-- Test 5a: Cap nhat TX_NHAN_DON -> kiem tra DON_HANG dong bo
 -- UPDATE TAI_XE_NHAN_DON SET Trang_thai_don = N'Da_giao' WHERE ID_don_hang = 4;
 -- SELECT Trang_thai FROM DON_HANG WHERE ID = 4;
--- => Mong doi: 'Da_giao' (duoc dong bo tu trigger)
+-- => Mong doi: 'Da_giao'
 
--- Test 5b: Kiem tra Doanh_thu NH5 tang sau khi DH4 chuyen sang Da_giao
--- SELECT Doanh_thu FROM NHA_HANG WHERE ID_nha_hang = 5;
--- => Mong doi: 250000 (DH4 Lau thai hai san)
+-- === TEST 4.6 - Trigger nha hang phai co mon an ===
+-- Test 6a: Xoa mon cuoi cung cua NH -> loi
+-- (Gia su NH5 chi con MA12, xoa MA12 se bi chan)
+-- EXEC sp_DeleteMonAn @ID = 12; -- Neu MA12 la mon cuoi cua NH5
+-- => Mong doi: RAISERROR - Khong the xoa mon an cuoi cung
 
-PRINT N'=== TAO 5 TRIGGERS THANH CONG ===';
+-- Test 6b: NH co nhieu hon 1 mon -> xoa 1 mon thanh cong
+-- EXEC sp_DeleteMonAn @ID = 11; -- MA11 trong NH5 van con MA10, MA12
+-- => Mong doi: Xoa thanh cong
+
+-- === TEST 4.7 - Trigger tu dong tao gio hang ===
+-- Test 7a: Tao khach hang moi -> gio hang tu dong duoc tao
+-- INSERT INTO TAI_KHOAN_NGUOI_DUNG (Ho, Ten, Mat_khau, email, Phan_loai_nguoi_dung)
+-- VALUES (N'Test', N'User', N'pass', N'test@test.com', N'Khach_hang');
+-- DECLARE @newID INT = SCOPE_IDENTITY();
+-- INSERT INTO KHACH_HANG (ID) VALUES (@newID);
+-- SELECT * FROM GIO_HANG WHERE ID_khach_hang = @newID;
+-- => Mong doi: 1 ban ghi GIO_HANG duoc tao tu dong
+
+-- === TEST 4.8 - Trigger nguoi dung phai co SDT ===
+-- Test 8a: Xoa SDT duy nhat cua nguoi dung -> loi
+-- DELETE FROM SO_DIEN_THOAI WHERE id_nguoi_dung = 2; -- KH Binh chi co 1 SDT
+-- => Mong doi: RAISERROR - Khong the xoa SDT cuoi cung
+
+-- Test 8b: Xoa 1 trong 2 SDT cua KH An (ID=1) -> thanh cong
+-- DELETE FROM SO_DIEN_THOAI WHERE SDT_chinh = '0901234568' AND id_nguoi_dung = 1;
+-- => Mong doi: Xoa thanh cong (KH An van con SDT '0901234567')
+
+-- === TEST 4.9 - Trigger tai xe phai Online ===
+-- Test 9a: TX 13 dang Offline -> Nhan don bi chan
+-- INSERT INTO TAI_XE_NHAN_DON (ID_don_hang, ID_tai_xe, Trang_thai_don)
+-- VALUES (7, 13, N'Da_nhan');
+-- => Mong doi: RAISERROR - Tai xe dang Offline
+
+-- Test 9b: TX 12 dang Online -> Nhan don thanh cong
+-- INSERT INTO TAI_XE_NHAN_DON (ID_don_hang, ID_tai_xe, Trang_thai_don)
+-- VALUES (7, 12, N'Da_nhan');
+-- => Mong doi: INSERT thanh cong
+
+-- === TEST 4.10 - Trigger validate danh gia ===
+-- Test 10a: KH 1 danh gia MA1 (da dat DH1 co MA1, Da_giao) -> thanh cong
+-- INSERT INTO DANH_GIA (ID_khach_hang, ID_mon_an, Binh_luan, Xep_hang)
+-- VALUES (1, 1, N'Test', 5);
+-- => Mong doi: INSERT thanh cong
+
+-- Test 10b: KH 1 danh gia MA11 (chua dat bao gio) -> loi
+-- INSERT INTO DANH_GIA (ID_khach_hang, ID_mon_an, Binh_luan, Xep_hang)
+-- VALUES (1, 11, N'Test', 4);
+-- => Mong doi: RAISERROR - Chua dat mon nay
+
+-- === TEST 4.11 - Trigger validate trang thai don hang ===
+-- Test 11a: Chuyen DH1 tu Da_giao -> Dang_giao (nguoc chieu) -> loi
+-- UPDATE DON_HANG SET Trang_thai = N'Dang_giao' WHERE ID = 1;
+-- => Mong doi: RAISERROR - Khong duoc chuyen nguoc
+
+-- Test 11b: Huy don bat ky trang thai -> thanh cong
+-- UPDATE DON_HANG SET Trang_thai = N'Da_huy' WHERE ID = 7;
+-- => Mong doi: UPDATE thanh cong
+
+-- === TEST 4.12 - Trigger validate thanh toan ===
+-- Test 12a: Sua thanh toan cua DH8 (Da_huy, TT8) -> loi
+-- UPDATE THANH_TOAN SET Trang_thai = N'Da_thanh_toan' WHERE ID = 8;
+-- => Mong doi: RAISERROR - Don hang da huy
+
+-- Test 12b: Sua thanh toan cua DH4 (Dang_giao, TT4) -> thanh cong
+-- UPDATE THANH_TOAN SET Trang_thai = N'Da_thanh_toan',
+--        Thoi_gian_thanh_toan = GETDATE() WHERE ID = 4;
+-- => Mong doi: UPDATE thanh cong
+
+PRINT N'=== TAO TRIGGERS THANH CONG (12 TRIGGERS) ===';
 GO
